@@ -51,7 +51,12 @@ def validate(rows: list[dict[str, Any]], expected_count: int | None) -> list[dic
     return normalized
 
 
-def apply_rows(database_path: Path, rows: list[dict[str, Any]], guessed: list[str], replace: bool) -> None:
+def apply_rows(
+    database_path: Path,
+    rows: list[dict[str, Any]],
+    guessed: list[str],
+    replace: bool,
+) -> None:
     migrate(database_path)
     if database_path.exists() and database_path.stat().st_size:
         backup_dir = database_path.parent / "backups"
@@ -62,14 +67,18 @@ def apply_rows(database_path: Path, rows: list[dict[str, Any]], guessed: list[st
     with transaction(database_path, immediate=True) as connection:
         count = connection.execute("SELECT COUNT(*) FROM menus").fetchone()[0]
         if count and not replace:
-            raise ValueError("database already contains menus; pass --replace after reviewing the backup")
+            raise ValueError(
+                "database already contains menus; "
+                "pass --replace after reviewing the backup"
+            )
         if replace:
             connection.execute("DELETE FROM guesses")
             connection.execute("DELETE FROM menus")
             connection.execute("DELETE FROM categories")
 
         categories: dict[str, int] = {}
-        for category_order, category_name in enumerate(dict.fromkeys(row["category"] for row in rows)):
+        category_names = dict.fromkeys(row["category"] for row in rows)
+        for category_order, category_name in enumerate(category_names):
             cursor = connection.execute(
                 "INSERT INTO categories(name, display_order) VALUES (?, ?)",
                 (category_name, category_order),
@@ -86,7 +95,8 @@ def apply_rows(database_path: Path, rows: list[dict[str, Any]], guessed: list[st
             raise ValueError(f"guessed menus not found: {', '.join(sorted(unknown_guesses))}")
 
         for category_name, category_rows in by_category.items():
-            for display_order, row in enumerate(sorted(category_rows, key=lambda item: item["name"])):
+            sorted_rows = sorted(category_rows, key=lambda item: item["name"])
+            for display_order, row in enumerate(sorted_rows):
                 menu_id = str(uuid5(NAMESPACE, row["name"]))
                 connection.execute(
                     """
