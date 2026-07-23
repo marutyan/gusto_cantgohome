@@ -37,7 +37,10 @@ def create_admin_app(database_path: str | Path | None = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, str]:
         ok = check_database(settings.database_path)
-        return {"status": "ok" if ok else "error", "database": "ok" if ok else "error"}
+        return {
+            "status": "ok" if ok else "error",
+            "database": "ok" if ok else "error",
+        }
 
     @app.get("/api/admin/state")
     def state() -> dict:
@@ -46,7 +49,8 @@ def create_admin_app(database_path: str | Path | None = None) -> FastAPI:
     @app.patch("/api/admin/menus/{menu_id}")
     def patch_menu(menu_id: str, payload: AdminMenuUpdate) -> dict:
         try:
-            return update_menu(settings.database_path, menu_id, payload.model_dump(exclude_unset=True))
+            changes = payload.model_dump(exclude_unset=True)
+            return update_menu(settings.database_path, menu_id, changes)
         except MenuNotFoundError as exc:
             raise HTTPException(status_code=404, detail="menu not found") from exc
         except sqlite3.IntegrityError as exc:
