@@ -30,7 +30,16 @@ jobs:
         run: |
           cat ruff-report.json
           exit 1
-      - run: pytest --ignore=tests/e2e
+      - id: unit_tests
+        continue-on-error: true
+        run: pytest --ignore=tests/e2e --junitxml=unit-results.xml
+      - if: steps.unit_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: unit-results.xml
+      - if: steps.unit_tests.outcome == 'failure'
+        run: exit 1
 
   e2e:
     runs-on: ubuntu-latest
@@ -42,4 +51,13 @@ jobs:
           cache: pip
       - run: pip install -e '.[dev]'
       - run: python -m playwright install --with-deps chromium
-      - run: pytest tests/e2e
+      - id: e2e_tests
+        continue-on-error: true
+        run: pytest tests/e2e --junitxml=e2e-results.xml
+      - if: steps.e2e_tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: e2e-results.xml
+      - if: steps.e2e_tests.outcome == 'failure'
+        run: exit 1
