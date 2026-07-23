@@ -1,32 +1,41 @@
 # gusto_cantgohome
 
-ガストの人気メニュートップ10を複数人で当てる共有Webアプリケーションです。未回答メニューの順位はブラウザへ送らず、回答送信後にだけ公開します。
+A small shared web application for guessing Gusto's top-10 menu ranking. The public UI reveals a rank only after a menu is submitted. The game state is shared through SQLite on `emma` and published through Tailscale Funnel.
 
-## 開発
+## Development
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e '.[dev]'
+python3 -m venv .venv
+. .venv/bin/activate
+pip install -e '.[dev]'
 python scripts/migrate.py --db data/gusto.sqlite3
-ruff check .
-pytest --ignore=tests/e2e
-python -m playwright install chromium
-pytest tests/e2e
 uvicorn app.public_app:app --reload --port 8010
 ```
 
-管理画面は公開アプリと分離して起動します。
+Admin UI:
 
 ```bash
-GUSTO_DB_PATH=data/gusto.sqlite3 uvicorn app.admin_app:app --host 127.0.0.1 --port 8011
+GUSTO_DB_PATH=data/gusto.sqlite3 uvicorn app.admin_app:app --reload --port 8011
 ```
 
-ランキングXLSX・CSV、SQLite、バックアップ、credential、`.env`はGitへ含めません。`scripts/import_rankings.py`でprivateファイルからDBへ直接取り込みます。
+## Validation
 
-## GitHub運用
+```bash
+ruff check .
+pytest
+```
 
-- Issue-firstで作業する。
-- 1 Issueは1成果または判断単位、1 commitは1論理単位、1 PRは1成果とする。
-- Pull Requestは通常のmerge commitで統合し、squash mergeは使用しない。
-- mergeは明示的な承認後にのみ行う。
+## Data handling
+
+Ranking workbooks, CSV files, SQLite databases, backups, credentials, and `.env` files must not be committed. Import the private ranking file directly on emma with `scripts/import_rankings.py`.
+
+## GitHub workflow
+
+- Issue first.
+- One issue is one outcome or decision unit.
+- One commit is one logical unit.
+- One pull request is one outcome.
+- Preserve individual commits: do not squash merge.
+- Do not merge without explicit approval.
+
+See `docs/architecture.md`, `docs/deployment.md`, and `docs/operations.md`.
