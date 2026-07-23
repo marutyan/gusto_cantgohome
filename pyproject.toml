@@ -17,6 +17,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<1",
+  "playwright>=1.52,<2",
   "pytest>=8,<10",
   "ruff>=0.11,<1",
 ]
@@ -27,6 +28,7 @@ include = ["app*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = ["e2e: browser-based end-to-end tests"]
 
 [tool.ruff]
 target-version = "py311"
