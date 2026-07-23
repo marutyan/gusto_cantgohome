@@ -2,6 +2,7 @@
 Description=Gusto top-10 admin application
 After=network-online.target
 Wants=network-online.target
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -10,7 +11,7 @@ Group=gusto-cantgohome
 EnvironmentFile=/etc/gusto-cantgohome/app.env
 WorkingDirectory=/opt/gusto-cantgohome/current
 ExecStart=/opt/gusto-cantgohome/venv/bin/uvicorn app.admin_app:app --host 127.0.0.1 --port 8011
-Restart=on-failure
+Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
