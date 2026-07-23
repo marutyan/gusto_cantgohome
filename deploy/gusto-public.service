@@ -1,0 +1,22 @@
+[Unit]
+Description=Gusto top-10 public application
+After=network-online.target tailscaled.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=gusto-cantgohome
+Group=gusto-cantgohome
+EnvironmentFile=/etc/gusto-cantgohome/app.env
+WorkingDirectory=/opt/gusto-cantgohome/current
+ExecStart=/opt/gusto-cantgohome/venv/bin/uvicorn app.public_app:app --host 127.0.0.1 --port 8010
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/gusto-cantgohome
+
+[Install]
+WantedBy=multi-user.target
