@@ -3,11 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.database import check_database, migrate
 from app.schemas import GuessRequest
 from app.services.game import MenuNotFoundError, get_public_state, submit_guesses
 from app.settings import load_settings
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 def create_public_app(database_path: str | Path | None = None) -> FastAPI:
@@ -15,6 +20,8 @@ def create_public_app(database_path: str | Path | None = None) -> FastAPI:
     migrate(settings.database_path)
     app = FastAPI(title="Gusto Top 10 Challenge", docs_url=None, redoc_url=None)
     app.state.settings = settings
+    app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+    templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
     @app.middleware("http")
     async def no_store_api(request: Request, call_next):  # type: ignore[no-untyped-def]
@@ -22,6 +29,14 @@ def create_public_app(database_path: str | Path | None = None) -> FastAPI:
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    @app.get("/", response_class=HTMLResponse)
+    def index(request: Request):  # type: ignore[no-untyped-def]
+        return templates.TemplateResponse(
+            request=request,
+            name="public/index.html",
+            context={"poll_interval_ms": settings.poll_interval_ms},
+        )
 
     @app.get("/health")
     def health() -> dict[str, str]:
