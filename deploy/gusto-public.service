@@ -1,7 +1,8 @@
 [Unit]
 Description=Gusto top-10 public application
 After=network-online.target tailscaled.service
-Wants=network-online.target
+Wants=network-online.target tailscaled.service
+StartLimitIntervalSec=0
 
 [Service]
 Type=simple
@@ -10,7 +11,7 @@ Group=gusto-cantgohome
 EnvironmentFile=/etc/gusto-cantgohome/app.env
 WorkingDirectory=/opt/gusto-cantgohome/current
 ExecStart=/opt/gusto-cantgohome/venv/bin/uvicorn app.public_app:app --host 127.0.0.1 --port 8010
-Restart=on-failure
+Restart=always
 RestartSec=5
 NoNewPrivileges=true
 PrivateTmp=true
