@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#b71c1c">
+  <title>ガスト TOP10チャレンジ</title>
+  <link rel="stylesheet" href="/static/public.css">
+</head>
+<body data-poll-interval="{{ poll_interval_ms }}">
+  <header class="hero">
+    <p class="eyebrow">みんなで挑戦</p>
+    <h1>ガスト <span>TOP10</span> チャレンジ</h1>
+    <p class="hero-copy">人気メニュー上位10品を当てるまで終われない。</p>
+  </header>
+
+  <main class="page-shell">
+    <section class="scoreboard" aria-label="ゲーム進捗">
+      <article><strong id="hit-count">0</strong><span>トップ10的中</span></article>
+      <article><strong id="answered-count">0 / 0</strong><span>回答済み</span></article>
+      <article class="hit-ranks"><strong id="hit-ranks">まだなし</strong><span>的中順位</span></article>
+    </section>
+
+    <section class="controls" aria-label="メニュー絞り込み">
+      <label class="search-box">
+        <span>メニュー検索</span>
+        <input id="menu-search" type="search" placeholder="メニュー名を入力" autocomplete="off">
+      </label>
+      <div id="category-tabs" class="category-tabs" role="tablist"></div>
+    </section>
+
+    <div id="status-message" class="status-message" role="status" aria-live="polite"></div>
+    <section id="menu-list" class="menu-list" aria-label="メニュー一覧"></section>
+  </main>
+
+  <aside id="selection-bar" class="selection-bar" hidden>
+    <span><strong id="selected-count">0</strong>件を選択中</span>
+    <button id="submit-selection" type="button">順位を確認する</button>
+  </aside>
+
+  <dialog id="confirm-dialog" class="confirm-dialog">
+    <form method="dialog">
+      <p class="dialog-kicker">最終確認</p>
+      <h2>このメニューで勝負しますか？</h2>
+      <ul id="confirm-menu-list"></ul>
+      <p>送信後は、全員の画面に順位が表示されます。</p>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary">戻る</button>
+        <button id="confirm-submit" value="default">順位発表へ</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="reveal-overlay" class="reveal-overlay" hidden aria-live="assertive">
+    <div class="reveal-stage">
+      <p class="reveal-label">順位発表</p>
+      <div id="reveal-menu" class="reveal-menu"></div>
+      <div id="reveal-rank" class="reveal-rank"></div>
+      <div id="reveal-top10" class="reveal-top10">トップ10入り！</div>
+    </div>
+  </div>
+
+  <script src="/static/public.js" defer></script>
+</body>
+</html>
