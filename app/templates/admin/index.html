@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ガストTOP10 情報修正</title>
+  <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+  <header><h1>情報修正画面</h1><p>SSHポートフォワード経由でのみ使用してください。</p></header>
+  <main>
+    <div class="toolbar">
+      <input id="search" type="search" placeholder="メニュー名で検索">
+      <button id="add-menu" type="button">メニューを追加</button>
+    </div>
+    <p id="status" role="status"></p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>順位</th><th>メニュー</th><th>カテゴリ</th><th>状態</th><th>回答</th><th></th></tr></thead>
+        <tbody id="menu-rows"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <dialog id="edit-dialog">
+    <form id="edit-form">
+      <h2 id="dialog-title">メニューを編集</h2>
+      <input id="menu-id" type="hidden">
+      <label>メニュー名<input id="name" required maxlength="120"></label>
+      <label>カテゴリ<input id="category" required maxlength="80" list="categories"></label>
+      <datalist id="categories"></datalist>
+      <div class="field-row">
+        <label>順位<input id="rank" type="number" min="1" required></label>
+        <label>表示順<input id="display-order" type="number" min="0" required></label>
+      </div>
+      <label class="check"><input id="active" type="checkbox"> 公開一覧に表示する</label>
+      <label class="check"><input id="answered" type="checkbox"> 回答済みにする</label>
+      <p class="warning">順位変更時、変更先の順位が使用中なら2つの順位を入れ替えます。</p>
+      <div class="actions"><button type="button" id="cancel">キャンセル</button><button type="submit">確認へ</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog">
+    <form method="dialog">
+      <h2>変更を保存しますか？</h2>
+      <pre id="change-summary"></pre>
+      <div class="actions"><button value="cancel">戻る</button><button value="save">保存する</button></div>
+    </form>
+  </dialog>
+  <script src="/static/admin.js" defer></script>
+</body>
+</html>

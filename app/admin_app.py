@@ -3,7 +3,10 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 from app.database import check_database, migrate
 from app.schemas import AdminMenuCreate, AdminMenuUpdate
@@ -16,12 +19,20 @@ from app.services.game import (
 )
 from app.settings import load_settings
 
+BASE_DIR = Path(__file__).resolve().parent
+
 
 def create_admin_app(database_path: str | Path | None = None) -> FastAPI:
     settings = load_settings(database_path)
     migrate(settings.database_path)
     app = FastAPI(title="Gusto Top 10 Admin", docs_url=None, redoc_url=None)
     app.state.settings = settings
+    app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+    templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+    @app.get("/", response_class=HTMLResponse)
+    def index(request: Request):  # type: ignore[no-untyped-def]
+        return templates.TemplateResponse(request=request, name="admin/index.html")
 
     @app.get("/health")
     def health() -> dict[str, str]:

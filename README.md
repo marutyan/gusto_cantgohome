@@ -16,6 +16,12 @@ pytest tests/e2e
 uvicorn app.public_app:app --reload --port 8010
 ```
 
+管理画面は公開アプリと分離して起動します。
+
+```bash
+GUSTO_DB_PATH=data/gusto.sqlite3 uvicorn app.admin_app:app --host 127.0.0.1 --port 8011
+```
+
 ランキングXLSX・CSV、SQLite、バックアップ、credential、`.env`はGitへ含めません。`scripts/import_rankings.py`でprivateファイルからDBへ直接取り込みます。
 
 ## GitHub運用
