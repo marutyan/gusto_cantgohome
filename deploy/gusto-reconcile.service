@@ -1,0 +1,13 @@
+[Unit]
+Description=Reconcile Gusto application health and Funnel configuration
+After=network-online.target tailscaled.service gusto-public.service gusto-admin.service
+Wants=network-online.target tailscaled.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /opt/gusto-cantgohome/current/deploy/reconcile-runtime.sh
+User=root
+Group=root
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true

@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically reconcile Gusto application runtime
+
+[Timer]
+OnBootSec=45s
+OnUnitActiveSec=5min
+RandomizedDelaySec=15s
+Persistent=true
+Unit=gusto-reconcile.service
+
+[Install]
+WantedBy=timers.target
