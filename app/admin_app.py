@@ -1,0 +1,56 @@
+from __future__ import annotations
+
+import sqlite3
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+
+from app.database import check_database, migrate
+from app.schemas import AdminMenuCreate, AdminMenuUpdate
+from app.services.game import (
+    MenuNotFoundError,
+    RankConflictError,
+    create_menu,
+    get_admin_state,
+    update_menu,
+)
+from app.settings import load_settings
+
+
+def create_admin_app(database_path: str | Path | None = None) -> FastAPI:
+    settings = load_settings(database_path)
+    migrate(settings.database_path)
+    app = FastAPI(title="Gusto Top 10 Admin", docs_url=None, redoc_url=None)
+    app.state.settings = settings
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        ok = check_database(settings.database_path)
+        return {"status": "ok" if ok else "error", "database": "ok" if ok else "error"}
+
+    @app.get("/api/admin/state")
+    def state() -> dict:
+        return get_admin_state(settings.database_path)
+
+    @app.patch("/api/admin/menus/{menu_id}")
+    def patch_menu(menu_id: str, payload: AdminMenuUpdate) -> dict:
+        try:
+            return update_menu(settings.database_path, menu_id, payload.model_dump(exclude_unset=True))
+        except MenuNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="menu not found") from exc
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    @app.post("/api/admin/menus", status_code=201)
+    def post_menu(payload: AdminMenuCreate) -> dict:
+        try:
+            return create_menu(settings.database_path, payload.model_dump())
+        except RankConflictError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return app
+
+
+app = create_admin_app()
