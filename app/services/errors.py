@@ -1,6 +1,5 @@
-class MenuNotFoundError(ValueError):
-    pass
+"""Compatibility facade for domain errors."""
 
+from app.domain.errors import MenuNotFoundError, RankConflictError
 
-class RankConflictError(ValueError):
-    pass
+__all__ = ["MenuNotFoundError", "RankConflictError"]

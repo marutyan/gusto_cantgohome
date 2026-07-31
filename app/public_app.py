@@ -1,59 +1,53 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.database import check_database, migrate
-from app.schemas import GuessRequest
-from app.services.game import MenuNotFoundError, get_public_state, submit_guesses
+from app.database import migrate
 from app.settings import load_settings
+from app.use_cases.public_game import PublicGameUseCases
+from app.use_cases.system import DatabaseHealthUseCase
+from app.web.middleware import no_store_api
+from app.web.public import create_public_router
 
 BASE_DIR = Path(__file__).resolve().parent
 
 
 def create_public_app(database_path: str | Path | None = None) -> FastAPI:
     settings = load_settings(database_path)
-    migrate(settings.database_path)
-    app = FastAPI(title="Gusto Top 10 Challenge", docs_url=None, redoc_url=None)
-    app.state.settings = settings
-    app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        migrate(settings.database_path)
+        yield
+
+    app = FastAPI(
+        title="Gusto Top 10 Challenge",
+        docs_url=None,
+        redoc_url=None,
+        lifespan=lifespan,
+    )
+    game = PublicGameUseCases(settings.database_path)
+    health = DatabaseHealthUseCase(settings.database_path)
     templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
-    @app.middleware("http")
-    async def no_store_api(request: Request, call_next):  # type: ignore[no-untyped-def]
-        response = await call_next(request)
-        if request.url.path.startswith("/api/"):
-            response.headers["Cache-Control"] = "no-store"
-        return response
-
-    @app.get("/", response_class=HTMLResponse)
-    def index(request: Request):  # type: ignore[no-untyped-def]
-        return templates.TemplateResponse(
-            request=request,
-            name="public/index.html",
-            context={"poll_interval_ms": settings.poll_interval_ms},
+    app.state.settings = settings
+    app.state.game_use_cases = game
+    app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+    app.middleware("http")(no_store_api)
+    app.include_router(
+        create_public_router(
+            game=game,
+            health=health,
+            templates=templates,
+            poll_interval_ms=settings.poll_interval_ms,
         )
-
-    @app.get("/health")
-    def health() -> dict[str, str]:
-        ok = check_database(settings.database_path)
-        return {"status": "ok" if ok else "error", "database": "ok" if ok else "error"}
-
-    @app.get("/api/state")
-    def state() -> dict:
-        return get_public_state(settings.database_path)
-
-    @app.post("/api/guesses")
-    def guesses(payload: GuessRequest) -> dict:
-        try:
-            return submit_guesses(settings.database_path, payload.menu_ids)
-        except MenuNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-
+    )
     return app
 
 
