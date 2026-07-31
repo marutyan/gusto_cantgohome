@@ -39,3 +39,28 @@ def test_funnel_reconciliation_only_manages_port_8443() -> None:
     assert "--https=8443" in content
     assert "--https=443" not in content
     assert "--https=8444" not in content
+
+
+def test_update_coordinates_database_and_release_rollback() -> None:
+    content = (DEPLOY / "update-emma.sh").read_text(encoding="utf-8")
+    deployment = content.split("trap rollback_deployment ERR", 1)[1]
+    assert deployment.index(
+        "systemctl stop gusto-public.service gusto-admin.service"
+    ) < deployment.index("backup_database.py")
+    assert deployment.index("backup_database.py") < deployment.index(
+        "DATABASE_MAY_HAVE_CHANGED=1"
+    )
+    assert deployment.index("DATABASE_MAY_HAVE_CHANGED=1") < deployment.index(
+        "scripts/migrate.py"
+    )
+
+    rollback = content.split("rollback_deployment() {", 1)[1].split(
+        "if [[ ! -x", 1
+    )[0]
+    assert rollback.index("restore_database.py") < rollback.index(
+        'ln -sfn "$PREVIOUS"'
+    )
+    assert rollback.index('ln -sfn "$PREVIOUS"') < rollback.index(
+        "systemctl restart gusto-public.service gusto-admin.service"
+    )
+    assert "refusing to restart services" in rollback
