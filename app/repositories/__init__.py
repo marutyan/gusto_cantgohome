@@ -1,0 +1,1 @@
+"""Typed SQLite repositories."""
