@@ -47,17 +47,21 @@ def _database_dump(database_path: Path) -> dict[str, list[tuple[object, ...]]]:
 
 
 def test_read_connection_rejects_writes(database_path: Path) -> None:
-    with read_connection(database_path) as connection:
-        with pytest.raises(sqlite3.OperationalError, match="readonly"):
-            connection.execute("DELETE FROM menus")
+    with (
+        read_connection(database_path) as connection,
+        pytest.raises(sqlite3.OperationalError, match="readonly"),
+    ):
+        connection.execute("DELETE FROM menus")
 
 
 def test_transaction_rolls_back_all_changes(database_path: Path) -> None:
     before = _database_dump(database_path)
-    with pytest.raises(RuntimeError, match="abort"):
-        with transaction(database_path, immediate=True) as connection:
-            connection.execute("DELETE FROM menus")
-            raise RuntimeError("abort")
+    with (
+        pytest.raises(RuntimeError, match="abort"),
+        transaction(database_path, immediate=True) as connection,
+    ):
+        connection.execute("DELETE FROM menus")
+        raise RuntimeError("abort")
     assert _database_dump(database_path) == before
 
 
