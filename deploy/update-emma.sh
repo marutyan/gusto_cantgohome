@@ -9,9 +9,12 @@ fi
 SOURCE_DIR=${1:-$(pwd)}
 APP_ROOT=/opt/gusto-cantgohome
 DATA_ROOT=/var/lib/gusto-cantgohome
+DATABASE_PATH=$DATA_ROOT/gusto.sqlite3
 RELEASE=$(git -C "$SOURCE_DIR" rev-parse HEAD)
 RELEASE_DIR="$APP_ROOT/releases/$RELEASE"
 PREVIOUS=$(readlink -f "$APP_ROOT/current" || true)
+BACKUP_PATH=
+DATABASE_MAY_HAVE_CHANGED=0
 
 wait_for_health() {
   local name=$1
@@ -32,18 +35,69 @@ wait_for_health() {
   return 1
 }
 
+rollback_deployment() {
+  local status=$?
+  local rollback_ok=1
+  trap - ERR
+  set +e
+
+  echo "deployment failed; starting coordinated rollback" >&2
+  systemctl stop gusto-public.service gusto-admin.service >/dev/null 2>&1 || true
+
+  if [[ $DATABASE_MAY_HAVE_CHANGED -eq 1 ]]; then
+    if [[ -z "$BACKUP_PATH" || ! -f "$BACKUP_PATH" ]]; then
+      echo "verified database snapshot is unavailable; refusing to restart services" >&2
+      rollback_ok=0
+    elif ! sudo -u gusto-cantgohome env PYTHONPATH="$SOURCE_DIR" \
+      "$APP_ROOT/venv/bin/python" "$SOURCE_DIR/scripts/restore_database.py" \
+      "$BACKUP_PATH" --db "$DATABASE_PATH"; then
+      echo "database restore failed; refusing to restart services" >&2
+      rollback_ok=0
+    fi
+  fi
+
+  if [[ -z "$PREVIOUS" || ! -d "$PREVIOUS" ]]; then
+    echo "previous release is unavailable; refusing to restart services" >&2
+    rollback_ok=0
+  elif [[ $rollback_ok -eq 1 ]]; then
+    ln -sfn "$PREVIOUS" "$APP_ROOT/current"
+    if ! systemctl restart gusto-public.service gusto-admin.service \
+      || ! wait_for_health public http://127.0.0.1:8010/health gusto-public.service \
+      || ! wait_for_health admin http://127.0.0.1:8011/health gusto-admin.service; then
+      echo "previous release did not recover; services remain stopped" >&2
+      rollback_ok=0
+    fi
+  fi
+
+  if [[ $rollback_ok -eq 1 ]]; then
+    systemctl start gusto-reconcile.timer >/dev/null 2>&1 || true
+    echo "rollback completed using $BACKUP_PATH" >&2
+  else
+    systemctl stop gusto-public.service gusto-admin.service >/dev/null 2>&1 || true
+    echo "rollback incomplete; manual recovery is required" >&2
+  fi
+  exit "$status"
+}
+
 if [[ ! -x "$APP_ROOT/venv/bin/python" ]]; then
   echo "application is not installed; run deploy/install-emma.sh first" >&2
   exit 1
 fi
 
+trap rollback_deployment ERR
 systemctl stop gusto-reconcile.timer >/dev/null 2>&1 || true
-trap 'systemctl start gusto-reconcile.timer >/dev/null 2>&1 || true' EXIT
+systemctl stop gusto-public.service gusto-admin.service
 
-sudo -u gusto-cantgohome "$APP_ROOT/venv/bin/python" \
-  "$APP_ROOT/current/scripts/backup_database.py" \
-  --db "$DATA_ROOT/gusto.sqlite3" \
-  --output-dir "$DATA_ROOT/backups"
+BACKUP_PATH=$(
+  sudo -u gusto-cantgohome env PYTHONPATH="$SOURCE_DIR" \
+    "$APP_ROOT/venv/bin/python" "$SOURCE_DIR/scripts/backup_database.py" \
+    --db "$DATABASE_PATH" \
+    --output-dir "$DATA_ROOT/backups"
+)
+if [[ -z "$BACKUP_PATH" || ! -f "$BACKUP_PATH" ]]; then
+  echo "verified database snapshot was not created" >&2
+  false
+fi
 
 rm -rf "$RELEASE_DIR"
 install -d "$RELEASE_DIR"
@@ -51,9 +105,10 @@ tar --exclude=.git --exclude=.venv -C "$SOURCE_DIR" -cf - . | tar -C "$RELEASE_D
 chown -R gusto-cantgohome:gusto-cantgohome "$RELEASE_DIR"
 
 "$APP_ROOT/venv/bin/pip" install "$SOURCE_DIR"
-sudo -u gusto-cantgohome "$APP_ROOT/venv/bin/python" \
-  "$RELEASE_DIR/scripts/migrate.py" \
-  --db "$DATA_ROOT/gusto.sqlite3"
+DATABASE_MAY_HAVE_CHANGED=1
+sudo -u gusto-cantgohome env PYTHONPATH="$RELEASE_DIR" \
+  "$APP_ROOT/venv/bin/python" "$RELEASE_DIR/scripts/migrate.py" \
+  --db "$DATABASE_PATH"
 ln -sfn "$RELEASE_DIR" "$APP_ROOT/current"
 
 install -m 0644 "$SOURCE_DIR/deploy/gusto-public.service" /etc/systemd/system/gusto-public.service
@@ -63,18 +118,11 @@ install -m 0644 "$SOURCE_DIR/deploy/gusto-reconcile.timer" /etc/systemd/system/g
 systemctl daemon-reload
 systemctl enable gusto-public.service gusto-admin.service gusto-reconcile.timer
 
-if ! systemctl restart gusto-public.service gusto-admin.service \
-  || ! wait_for_health public http://127.0.0.1:8010/health gusto-public.service \
-  || ! wait_for_health admin http://127.0.0.1:8011/health gusto-admin.service; then
-  echo "deployment failed; restoring previous release" >&2
-  if [[ -n "$PREVIOUS" && -d "$PREVIOUS" ]]; then
-    ln -sfn "$PREVIOUS" "$APP_ROOT/current"
-    systemctl restart gusto-public.service gusto-admin.service
-  fi
-  exit 1
-fi
-
+systemctl restart gusto-public.service gusto-admin.service
+wait_for_health public http://127.0.0.1:8010/health gusto-public.service
+wait_for_health admin http://127.0.0.1:8011/health gusto-admin.service
 systemctl enable --now gusto-reconcile.timer
 systemctl start gusto-reconcile.service
 
-echo "deployed $RELEASE"
+trap - ERR
+echo "deployed $RELEASE; verified database snapshot: $BACKUP_PATH"
