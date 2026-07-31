@@ -48,8 +48,8 @@ rollback_deployment() {
     if [[ -z "$BACKUP_PATH" || ! -f "$BACKUP_PATH" ]]; then
       echo "verified database snapshot is unavailable; refusing to restart services" >&2
       rollback_ok=0
-    elif ! sudo -u gusto-cantgohome env PYTHONPATH="$SOURCE_DIR" \
-      "$APP_ROOT/venv/bin/python" "$SOURCE_DIR/scripts/restore_database.py" \
+    elif ! sudo -u gusto-cantgohome env PYTHONPATH="$RELEASE_DIR" \
+      "$APP_ROOT/venv/bin/python" "$RELEASE_DIR/scripts/restore_database.py" \
       "$BACKUP_PATH" --db "$DATABASE_PATH"; then
       echo "database restore failed; refusing to restart services" >&2
       rollback_ok=0
@@ -88,9 +88,14 @@ trap rollback_deployment ERR
 systemctl stop gusto-reconcile.timer >/dev/null 2>&1 || true
 systemctl stop gusto-public.service gusto-admin.service
 
+rm -rf "$RELEASE_DIR"
+install -d "$RELEASE_DIR"
+tar --exclude=.git --exclude=.venv -C "$SOURCE_DIR" -cf - . | tar -C "$RELEASE_DIR" -xf -
+chown -R gusto-cantgohome:gusto-cantgohome "$RELEASE_DIR"
+
 BACKUP_PATH=$(
-  sudo -u gusto-cantgohome env PYTHONPATH="$SOURCE_DIR" \
-    "$APP_ROOT/venv/bin/python" "$SOURCE_DIR/scripts/backup_database.py" \
+  sudo -u gusto-cantgohome env PYTHONPATH="$RELEASE_DIR" \
+    "$APP_ROOT/venv/bin/python" "$RELEASE_DIR/scripts/backup_database.py" \
     --db "$DATABASE_PATH" \
     --output-dir "$DATA_ROOT/backups"
 )
@@ -98,11 +103,6 @@ if [[ -z "$BACKUP_PATH" || ! -f "$BACKUP_PATH" ]]; then
   echo "verified database snapshot was not created" >&2
   false
 fi
-
-rm -rf "$RELEASE_DIR"
-install -d "$RELEASE_DIR"
-tar --exclude=.git --exclude=.venv -C "$SOURCE_DIR" -cf - . | tar -C "$RELEASE_DIR" -xf -
-chown -R gusto-cantgohome:gusto-cantgohome "$RELEASE_DIR"
 
 "$APP_ROOT/venv/bin/pip" install "$SOURCE_DIR"
 DATABASE_MAY_HAVE_CHANGED=1
