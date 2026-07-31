@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from app.database import read_connection, transaction
+from app.domain.errors import MenuNotFoundError
 from app.repositories.public_game import PublicGameRepository
-from app.services.errors import MenuNotFoundError
 
 
 @dataclass(frozen=True, slots=True)
