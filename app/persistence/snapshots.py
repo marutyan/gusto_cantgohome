@@ -29,11 +29,13 @@ def _fsync_directory(path: Path) -> None:
 
 
 def _copy_database(source: Path, destination: Path) -> None:
-    with connect(source, read_only=True) as source_connection:
-        with sqlite3.connect(destination) as target_connection:
-            source_connection.backup(target_connection)
-            target_connection.execute("PRAGMA journal_mode = DELETE")
-            target_connection.commit()
+    with (
+        connect(source, read_only=True) as source_connection,
+        sqlite3.connect(destination) as target_connection,
+    ):
+        source_connection.backup(target_connection)
+        target_connection.execute("PRAGMA journal_mode = DELETE")
+        target_connection.commit()
 
 
 def create_verified_snapshot(
