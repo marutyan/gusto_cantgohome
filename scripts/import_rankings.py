@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import csv
-import sqlite3
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -11,6 +10,7 @@ from uuid import UUID, uuid5
 from openpyxl import load_workbook
 
 from app.database import migrate, read_connection, transaction
+from app.persistence.snapshots import create_timestamped_snapshot
 
 NAMESPACE = UUID("c1b85144-1b07-4bd8-96c2-75616a8f8c9c")
 REQUIRED_COLUMNS = {"総合順位", "メニュー名", "カテゴリ"}
@@ -59,11 +59,12 @@ def apply_rows(
 ) -> None:
     migrate(database_path)
     if database_path.exists() and database_path.stat().st_size:
-        backup_dir = database_path.parent / "backups"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        backup_path = backup_dir / f"{database_path.stem}.before-import.sqlite3"
-        with sqlite3.connect(database_path) as source, sqlite3.connect(backup_path) as target:
-            source.backup(target)
+        backup_path = create_timestamped_snapshot(
+            database_path,
+            database_path.parent / "backups",
+            label="before-import",
+        )
+        print(f"backup: {backup_path}")
     with transaction(database_path, immediate=True) as connection:
         count = connection.execute("SELECT COUNT(*) FROM menus").fetchone()[0]
         if count and not replace:
